@@ -26,17 +26,9 @@ import (
 	"time"
 )
 
-const (
-	headerBlock   int = 0
-	titleBlock    int = iota
-	releasesBlock int = iota
-	linksBlock    int = iota
-)
-
 var (
 	emptyLine      = regexp.MustCompile(`^\s*$`)
-	commentStart   = regexp.MustCompile(`^\s*<!--.*$`)
-	commentEnd     = regexp.MustCompile(`-->\s*$`)
+	commentCheck   = regexp.MustCompile(`^\s*<!--.*-->\s*$`)
 	titleRE        = regexp.MustCompile(`^\s*#\s*(.*)\s*$`)
 	semverRE       = regexp.MustCompile(`https?://semver.org/spec/(.*?).html`)
 	changelogVerRE = regexp.MustCompile(`https?://keepachangelog.com/[^/]*/([^/]*)/`)
@@ -134,154 +126,22 @@ type Opts struct {
 
 // Parse takes a bufio.Scanner and processes the file into
 func Parse(r io.Reader, opts *Opts) (*Changelog, error) {
-	var lastRelease *Release
 
 	rv := Changelog{}
-	lastDetail := ""
-	commentBlock := false
-	phase := headerBlock
-	line := 0
 
 	s := bufio.NewScanner(r)
 
-	for s.Scan() {
-		text := s.Text()
-		line++
-
-		// Skip empty lines everywhere except the title block
-		if phase != titleBlock && emptyLine.MatchString(text) {
-			continue
-		}
-
-		// The bufio.Scanner doesn't allow for backtracking.  To simplify the
-		// overall logic, using a goto to jump to the right parsing section
-		// logic is probably the easiest thing to do right now.
-	reevaluate_line:
-
-		switch phase {
-		case headerBlock:
-			// The comment handling is pretty weak.  TODO: handle multiple
-			// comments per line or other weird variants
-			if commentStart.MatchString(text) {
-				commentBlock = true
-			}
-
-			if commentBlock {
-				rv.CommentHeader = append(rv.CommentHeader, text)
-				if commentEnd.MatchString(text) {
-					commentBlock = false
-				}
-				if commentBlock {
-					continue
-				}
-			}
-
-			if titleRE.MatchString(text) {
-				title := titleRE.FindStringSubmatch(text)
-				if 1 <= len(title) {
-					rv.Title = title[1]
-				} else {
-					return nil, fmt.Errorf("Invalid title found at line: %d", line)
-				}
-				phase = titleBlock
-			}
-
-		case titleBlock:
-			if releaseRE.MatchString(text) {
-				rv.evalDesc()
-				phase = releasesBlock
-				goto reevaluate_line
-			}
-			rv.Description = append(rv.Description, text)
-
-		case releasesBlock:
-			if linksRE.MatchString(text) {
-				if lastRelease != nil {
-					rv.Releases = append(rv.Releases, *lastRelease)
-					lastRelease = nil
-				}
-
-				phase = linksBlock
-				goto reevaluate_line
-			}
-
-			if releaseRE.MatchString(text) {
-				if lastRelease != nil {
-					rv.Releases = append(rv.Releases, *lastRelease)
-				}
-				lastRelease = new(Release)
-
-				// Always add the line to the enire body field
-				lastRelease.Body = append(lastRelease.Body, text)
-
-				found := releaseRE.FindStringSubmatch(text)
-				if 1 <= len(found) {
-					lastRelease.Title = found[1]
-				}
-				if 2 <= len(found) {
-					lastRelease.Version = found[2]
-				}
-				if 4 <= len(found) && found[4] != "" {
-					got, err := time.Parse("2006-01-02", found[4])
-					if nil != err {
-						return nil, fmt.Errorf("Invalid date found at line: %d.  YYYY-MM-DD is required.  '%s' found.", line, found[4])
-					}
-					lastRelease.Date = &got
-				}
-				if 5 <= len(found) && found[5] != "" {
-					lastRelease.Yanked = true
-				}
-				lastDetail = ""
-				continue
-			}
-
-			// Always add the line to the enire body field
-			lastRelease.Body = append(lastRelease.Body, text)
-
-			if detailsRE.MatchString(text) {
-				found := detailsRE.FindStringSubmatch(text)
-				if 1 <= len(found) {
-					lastDetail = strings.ToLower(found[1])
-				}
-				continue
-			}
-
-			switch lastDetail {
-			case "":
-				lastRelease.Other = append(lastRelease.Other, text)
-			case "added":
-				lastRelease.Added = append(lastRelease.Added, text)
-			case "changed":
-				lastRelease.Changed = append(lastRelease.Changed, text)
-			case "deprecated":
-				lastRelease.Deprecated = append(lastRelease.Deprecated, text)
-			case "fixed":
-				lastRelease.Fixed = append(lastRelease.Fixed, text)
-			case "removed":
-				lastRelease.Removed = append(lastRelease.Removed, text)
-			case "security":
-				lastRelease.Security = append(lastRelease.Security, text)
-			}
-
-		case linksBlock:
-			if linksRE.MatchString(text) {
-				found := linksRE.FindStringSubmatch(text)
-				if 2 <= len(found) {
-					link := Link{
-						Version: found[1],
-						Url:     found[2],
-					}
-					rv.Links = append(rv.Links, link)
-				}
-			}
-		}
+	err := rv.addHeaders(s)
+	if err != nil {
+		return nil, err
 	}
 
-	// There could be a last release if there was no links section
-	if lastRelease != nil {
-		rv.Releases = append(rv.Releases, *lastRelease)
-		lastRelease = nil
+	rv.addTitleBlock(s)
+	err = rv.addReleases(s)
+	if err != nil {
+		return nil, err
 	}
+	rv.addLinks(s)
 
 	if err := s.Err(); err != nil {
 		return nil, err
@@ -331,6 +191,152 @@ func (cl *Changelog) evalDesc() {
 	clver := changelogVerRE.FindStringSubmatch(desc)
 	if 1 <= len(clver) {
 		cl.KeepAChangelogVersion = clver[1]
+	}
+}
+
+// newRelease attempts to create a new release object based off the stream of
+// data from the scanner.  When it returns (nil, nil) there is nothing left to
+// do and there are no more releases
+func newRelease(s *bufio.Scanner) (*Release, error) {
+	if !releaseRE.MatchString(s.Text()) {
+		return nil, nil
+	}
+
+	found := releaseRE.FindStringSubmatch(s.Text())
+
+	r := &Release{
+		Body:    []string{s.Text()},
+		Title:   found[1],
+		Version: found[2],
+	}
+
+	if found[4] != "" {
+		got, err := time.Parse("2006-01-02", found[4])
+		if nil != err {
+			return nil, fmt.Errorf("Invalid date found: '%s'.  YYYY-MM-DD is required.", found[4])
+		}
+		r.Date = &got
+	}
+	if found[5] != "" {
+		r.Yanked = true
+	}
+
+	lastDetail := ""
+	for {
+		if !s.Scan() ||
+			linksRE.MatchString(s.Text()) ||
+			releaseRE.MatchString(s.Text()) {
+			return r, nil
+		}
+
+		text := s.Text()
+		if emptyLine.MatchString(text) {
+			continue
+		}
+
+		r.Body = append(r.Body, text)
+
+		found := detailsRE.FindStringSubmatch(text)
+		if found != nil {
+			lastDetail = strings.ToLower(found[1])
+			continue
+		}
+
+		r.appendTo(lastDetail, text)
+	}
+}
+
+func (r *Release) appendTo(which, text string) {
+	switch which {
+	case "":
+		r.Other = append(r.Other, text)
+	case "added":
+		r.Added = append(r.Added, text)
+	case "changed":
+		r.Changed = append(r.Changed, text)
+	case "deprecated":
+		r.Deprecated = append(r.Deprecated, text)
+	case "fixed":
+		r.Fixed = append(r.Fixed, text)
+	case "removed":
+		r.Removed = append(r.Removed, text)
+	case "security":
+		r.Security = append(r.Security, text)
+	}
+}
+
+// addHeaders adds the header comments if present to the changelog object.
+func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
+	for {
+		if titleRE.MatchString(s.Text()) {
+			full := strings.Join(cl.CommentHeader, " ")
+			if full != "" && !commentCheck.MatchString(full) {
+				return fmt.Errorf("Header was not just comments.")
+			}
+			return nil
+		}
+
+		if !emptyLine.MatchString(s.Text()) {
+			cl.CommentHeader = append(cl.CommentHeader, s.Text())
+		}
+
+		if !s.Scan() {
+			return fmt.Errorf("Only the header was present.")
+		}
+	}
+}
+
+// addReleases adds all the found releases to the changelog object.
+func (cl *Changelog) addReleases(s *bufio.Scanner) error {
+	for {
+		r, err := newRelease(s)
+		if err != nil {
+			return err
+		}
+		if r == nil {
+			return nil
+		}
+
+		cl.Releases = append(cl.Releases, *r)
+	}
+}
+
+// addTitleBlock adds the title block information to the changelog object.
+func (cl *Changelog) addTitleBlock(s *bufio.Scanner) {
+	title := titleRE.FindStringSubmatch(s.Text())
+	if title == nil {
+		return
+	}
+
+	cl.Title = title[1]
+
+	for {
+		if !s.Scan() ||
+			linksRE.MatchString(s.Text()) ||
+			releaseRE.MatchString(s.Text()) {
+			cl.evalDesc()
+			return
+		}
+
+		cl.Description = append(cl.Description, s.Text())
+	}
+}
+
+// addLinks adds the links (if present) to the changelog object.
+func (cl *Changelog) addLinks(s *bufio.Scanner) {
+	for {
+		found := linksRE.FindStringSubmatch(s.Text())
+		if found != nil {
+			link := Link{
+				Version: found[1],
+				Url:     found[2],
+			}
+			cl.Links = append(cl.Links, link)
+		}
+
+		if !s.Scan() {
+			return
+		}
 	}
 }
 
