@@ -1,19 +1,21 @@
-# __PROJECT__
+# gokeepachangelog
 
-__PROJECT__ does something good.
+Keeping a changelog as https://keepachangelog.com suggests is a great way to
+help communicate releases of software.  This library processes that file into
+a useful go structure that can be examined, updated and output.
 
-[![Build Status](https://github.com/xmidt-org/__PROJECT__/workflows/CI/badge.svg)](https://github.com/xmidt-org/__PROJECT__/actions)
-[![codecov.io](http://codecov.io/github/xmidt-org/__PROJECT__/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/__PROJECT__?branch=main)
-[![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/__PROJECT__)](https://goreportcard.com/report/github.com/xmidt-org/__PROJECT__)
-[![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/__PROJECT__/blob/main/LICENSE)
+[![Build Status](https://github.com/xmidt-org/gokeepachangelog/workflows/CI/badge.svg)](https://github.com/xmidt-org/gokeepachangelog/actions)
+[![codecov.io](http://codecov.io/github/xmidt-org/gokeepachangelog/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/gokeepachangelog?branch=main)
+[![Go Report Card](https://goreportcard.com/badge/github.com/xmidt-org/gokeepachangelog)](https://goreportcard.com/report/github.com/xmidt-org/gokeepachangelog)
+[![Apache V2 License](http://img.shields.io/badge/license-Apache%20V2-blue.svg)](https://github.com/xmidt-org/gokeepachangelog/blob/main/LICENSE)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=xmidt-org_PROJECT&metric=alert_status)](https://sonarcloud.io/dashboard?id=xmidt-org_PROJECT)
-[![GitHub release](https://img.shields.io/github/release/xmidt-org/__PROJECT__.svg)](CHANGELOG.md)
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/xmidt-org/__PROJECT__)](https://pkg.go.dev/github.com/xmidt-org/__PROJECT__)
+[![GitHub release](https://img.shields.io/github/release/xmidt-org/gokeepachangelog.svg)](CHANGELOG.md)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/xmidt-org/gokeepachangelog)](https://pkg.go.dev/github.com/xmidt-org/gokeepachangelog)
 
 ## Setup
 
-1. Search and replace __PROJECT__ with your project name.
-1. Initialize `go.mod` file: `go mod init github.com/xmidt-org/__PROJECT__`
+1. Search and replace gokeepachangelog with your project name.
+1. Initialize `go.mod` file: `go mod init github.com/xmidt-org/gokeepachangelog`
 1. Add org teams to project (Settings > Manage Access): 
     - xmidt-org/admins with Admin role
     - xmidt-org/server-writers with Write role
