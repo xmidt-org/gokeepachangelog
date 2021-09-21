@@ -290,9 +290,8 @@ func Parse(r io.Reader, opts *Opts) (*Changelog, error) {
 	return &rv, nil
 }
 
-// Write converts the Changelog structure into a markdown formatted stream of
-// characters and outputs it to w.  The number of bytes written and the first
-// error if present are returned.
+// ToMarkdown converts the Changelog structure into a markdown formatted stream of
+// characters and returns the string.
 func (cl *Changelog) ToMarkdown() string {
 	out := ""
 	for _, line := range cl.CommentHeader {
