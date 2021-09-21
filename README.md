@@ -1,8 +1,6 @@
 # gokeepachangelog
 
-Keeping a changelog as https://keepachangelog.com suggests is a great way to
-help communicate releases of software.  This library processes that file into
-a useful go structure that can be examined, updated and output.
+Enabling you to do fun things with a changelog.
 
 [![Build Status](https://github.com/xmidt-org/gokeepachangelog/workflows/CI/badge.svg)](https://github.com/xmidt-org/gokeepachangelog/actions)
 [![codecov.io](http://codecov.io/github/xmidt-org/gokeepachangelog/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/gokeepachangelog?branch=main)
@@ -12,29 +10,11 @@ a useful go structure that can be examined, updated and output.
 [![GitHub release](https://img.shields.io/github/release/xmidt-org/gokeepachangelog.svg)](CHANGELOG.md)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/xmidt-org/gokeepachangelog)](https://pkg.go.dev/github.com/xmidt-org/gokeepachangelog)
 
-## Setup
-
-1. Search and replace gokeepachangelog with your project name.
-1. Initialize `go.mod` file: `go mod init github.com/xmidt-org/gokeepachangelog`
-1. Add org teams to project (Settings > Manage Access): 
-    - xmidt-org/admins with Admin role
-    - xmidt-org/server-writers with Write role
-1. Manually create the first release.  After v0.0.1 exists, other releases will be made by automation after the CHANGELOG is updated to reflect a new version header and nothing under the Unreleased header.
-1. For libraries:
-    1. Add org workflows in dir `.github/workflows`: push, tag, and release. This can be done by going to the Actions tab for the repo on the github site.
-    1. Remove the following files/dirs: `.dockerignore`, `Dockerfile`, `Makefile`, `rpkg.macros`, `__PROJECT__.yaml`, `deploy/`, and `conf/`.
-1. For applications:
-    1. Remove PkgGoDev badge from this file.
-    1. Add org workflows in dir `.github/workflows`: push, tag, release, and docker-release. This can be done by going to the Actions tab for the repo on the github site.
-    1. Add project name, `.ignore`, and `errors.txt` to `.gitignore` file.
-    1. Update `Dockerfile` - choose new ports to expose that no current XMiDT application is using.
-    1. Update `deploy/packaging/__PROJECT__.spec` file to have a proper Summary and Description.
-    1. Update `conf/__PROJECT__.service` file to have a proper Description.
-
-
 ## Summary
 
-Summary should be a small paragraph explanation of what this project does.
+Keeping a changelog as https://keepachangelog.com suggests is a great way to
+help communicate releases of software.  This library processes that file into
+a useful go structure that can be examined, updated and output.
 
 ## Table of Contents
 
