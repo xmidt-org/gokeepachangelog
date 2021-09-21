@@ -29,8 +29,6 @@ import (
 var (
 	emptyLine      = regexp.MustCompile(`^\s*$`)
 	commentCheck   = regexp.MustCompile(`^\s*<!--.*-->\s*$`)
-	commentStart   = regexp.MustCompile(`^\s*<!--.*$`)
-	commentEnd     = regexp.MustCompile(`-->\s*$`)
 	titleRE        = regexp.MustCompile(`^\s*#\s*(.*)\s*$`)
 	semverRE       = regexp.MustCompile(`https?://semver.org/spec/(.*?).html`)
 	changelogVerRE = regexp.MustCompile(`https?://keepachangelog.com/[^/]*/([^/]*)/`)
@@ -204,13 +202,14 @@ func newRelease(s *bufio.Scanner) (*Release, error) {
 		return nil, nil
 	}
 
-	r := new(Release)
-
-	r.Body = append(r.Body, s.Text())
-
 	found := releaseRE.FindStringSubmatch(s.Text())
-	r.Title = found[1]
-	r.Version = found[2]
+
+	r := &Release{
+		Body:    []string{s.Text()},
+		Title:   found[1],
+		Version: found[2],
+	}
+
 	if found[4] != "" {
 		got, err := time.Parse("2006-01-02", found[4])
 		if nil != err {
@@ -224,7 +223,7 @@ func newRelease(s *bufio.Scanner) (*Release, error) {
 
 	lastDetail := ""
 	for {
-		if s.Scan() == false ||
+		if !s.Scan() ||
 			linksRE.MatchString(s.Text()) ||
 			releaseRE.MatchString(s.Text()) {
 			return r, nil
@@ -237,30 +236,32 @@ func newRelease(s *bufio.Scanner) (*Release, error) {
 
 		r.Body = append(r.Body, text)
 
-		if detailsRE.MatchString(text) {
-			found := detailsRE.FindStringSubmatch(text)
-			if 1 <= len(found) {
-				lastDetail = strings.ToLower(found[1])
-			}
+		found := detailsRE.FindStringSubmatch(text)
+		if found != nil {
+			lastDetail = strings.ToLower(found[1])
 			continue
 		}
 
-		switch lastDetail {
-		case "":
-			r.Other = append(r.Other, text)
-		case "added":
-			r.Added = append(r.Added, text)
-		case "changed":
-			r.Changed = append(r.Changed, text)
-		case "deprecated":
-			r.Deprecated = append(r.Deprecated, text)
-		case "fixed":
-			r.Fixed = append(r.Fixed, text)
-		case "removed":
-			r.Removed = append(r.Removed, text)
-		case "security":
-			r.Security = append(r.Security, text)
-		}
+		r.appendTo(lastDetail, text)
+	}
+}
+
+func (r *Release) appendTo(which, text string) {
+	switch which {
+	case "":
+		r.Other = append(r.Other, text)
+	case "added":
+		r.Added = append(r.Added, text)
+	case "changed":
+		r.Changed = append(r.Changed, text)
+	case "deprecated":
+		r.Deprecated = append(r.Deprecated, text)
+	case "fixed":
+		r.Fixed = append(r.Fixed, text)
+	case "removed":
+		r.Removed = append(r.Removed, text)
+	case "security":
+		r.Security = append(r.Security, text)
 	}
 }
 
@@ -269,7 +270,7 @@ func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 	for {
 		if titleRE.MatchString(s.Text()) {
 			full := strings.Join(cl.CommentHeader, " ")
-			if full != "" && false == commentCheck.MatchString(full) {
+			if full != "" && !commentCheck.MatchString(full) {
 				return fmt.Errorf("Header was not just comments.")
 			}
 			return nil
@@ -279,7 +280,7 @@ func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 			cl.CommentHeader = append(cl.CommentHeader, s.Text())
 		}
 
-		if s.Scan() == false {
+		if !s.Scan() {
 			return fmt.Errorf("Only the header was present.")
 		}
 	}
@@ -310,7 +311,7 @@ func (cl *Changelog) addTitleBlock(s *bufio.Scanner) {
 	cl.Title = title[1]
 
 	for {
-		if s.Scan() == false ||
+		if !s.Scan() ||
 			linksRE.MatchString(s.Text()) ||
 			releaseRE.MatchString(s.Text()) {
 			cl.evalDesc()
