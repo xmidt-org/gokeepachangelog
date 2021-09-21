@@ -126,10 +126,10 @@ type Changelog struct {
 	Links []Link
 }
 
-// The Options for parsing
+// The Opts used for parsing the input stream.
 type Opts struct {
-	AllowInconsistentCase bool
-	AllowMissingDate      bool
+	AllowInconsistentCase bool // TODO: Ignore the case of keywords in the markdown
+	EnforceDateIsPresent  bool // TODO: Enforce that a date is present and correct
 }
 
 // Parse takes a bufio.Scanner and processes the file into
