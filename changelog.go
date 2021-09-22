@@ -27,71 +27,12 @@ import (
 )
 
 var (
-	emptyLine      = regexp.MustCompile(`^\s*$`)
-	commentCheck   = regexp.MustCompile(`^\s*<!--.*-->\s*$`)
-	titleRE        = regexp.MustCompile(`^\s*#\s*(.*)\s*$`)
-	semverRE       = regexp.MustCompile(`https?://semver.org/spec/(.*?).html`)
-	changelogVerRE = regexp.MustCompile(`https?://keepachangelog.com/[^/]*/([^/]*)/`)
-	releaseRE      = regexp.MustCompile(`^\s*##\s*(\[([^\]]*)\](\s*-\s*(\d{4}-\d\d-\d\d))?\s*(\[\s*YANKED\s*\])?)\s*$`)
-	detailsRE      = regexp.MustCompile(`^\s*###\s*(Added|Changed|Deprecated|Fixed|Removed|Security)\s*$`)
-	linksRE        = regexp.MustCompile(`^\s*\[([^\]]*)\]\s*:\s*(https?://.*?)\s*$`)
+	emptyLineRegex = regexp.MustCompile(`^\s*$`)
+	titleRegex     = regexp.MustCompile(`^\s*#\s*([^#\s].+)\s*$`)
+	linksRegex     = regexp.MustCompile(`(?i)^\s*\[([^\]]*)\]\s*:\s*(https?://.*?)\s*$`)
+	releaseRegex   = regexp.MustCompile(`(?i)^\s*##\s+(\[([^\]]*)\]\s*-?\s*(\d{4}-\d\d-\d\d)?\s*(\[\s*YANKED\s*\])?)\s*$`)
+	detailsRegex   = regexp.MustCompile(`(?i)^\s*###\s+(Added|Changed|Deprecated|Fixed|Removed|Security)\s*$`)
 )
-
-// Release represents a documented release.
-type Release struct {
-	// The entire text following the ## prefix.
-	Title string
-
-	// The version of the release.  It could be v1.0.2, 1.0.3-pre1 or Unreleased
-	// as examples.
-	Version string
-
-	// The date of the release if present.
-	Date *time.Time
-
-	// If a release has been yanked.
-	Yanked bool
-
-	// Detailed types of changes follow.  If there are multiple instances of
-	// the header, they are merged together and stored in the order they appear
-	// in the file.
-
-	// The lines under the '### Added` header.
-	Added []string
-
-	// The lines under the '### Changed' header.
-	Changed []string
-
-	// The lines under the '### Depreceted' header.
-	Deprecated []string
-
-	// The lines under the '### Removed' header.
-	Removed []string
-
-	// The lines under the '### Fixed' header.
-	Fixed []string
-
-	// The lines under the '### Security' header.
-	Security []string
-
-	// The lines the might immediately follow the release line but not be
-	// associated with any specific header.
-	Other []string
-
-	// The entire body of the release in case that is useful.
-	Body []string
-}
-
-// The Link structure containing the release version and the representing URL.
-type Link struct {
-	// The version of the release.  It could be v1.0.2, 1.0.3-pre1 or Unreleased
-	// as examples.
-	Version string
-
-	// The following URL that describes the difference between this release and
-	// the previous release
-	Url string
-}
 
 // The Changelog structure contains the entire changelog.  It may be populated
 // from a file or programatically.
@@ -118,14 +59,8 @@ type Changelog struct {
 	Links []Link
 }
 
-// The Opts used for parsing the input stream.
-type Opts struct {
-	AllowInconsistentCase bool // TODO: Ignore the case of keywords in the markdown
-	EnforceDateIsPresent  bool // TODO: Enforce that a date is present and correct
-}
-
 // Parse takes a bufio.Scanner and processes the file into
-func Parse(r io.Reader, opts *Opts) (*Changelog, error) {
+func Parse(r io.Reader) (*Changelog, error) {
 
 	rv := Changelog{}
 
@@ -183,100 +118,33 @@ func (cl *Changelog) ToMarkdown() string {
 func (cl *Changelog) evalDesc() {
 	desc := strings.Join(cl.Description, " ")
 
-	semver := semverRE.FindStringSubmatch(desc)
+	svre := regexp.MustCompile(`(?i)https?://semver.org/spec/(.*?).html`)
+	semver := svre.FindStringSubmatch(desc)
 	if 1 <= len(semver) {
 		cl.SemVerVersion = semver[1]
 	}
 
-	clver := changelogVerRE.FindStringSubmatch(desc)
+	kaclre := regexp.MustCompile(`(?i)https?://keepachangelog.com/[^/]*/([^/]*)/`)
+	clver := kaclre.FindStringSubmatch(desc)
 	if 1 <= len(clver) {
 		cl.KeepAChangelogVersion = clver[1]
-	}
-}
-
-// newRelease attempts to create a new release object based off the stream of
-// data from the scanner.  When it returns (nil, nil) there is nothing left to
-// do and there are no more releases
-func newRelease(s *bufio.Scanner) (*Release, error) {
-	if !releaseRE.MatchString(s.Text()) {
-		return nil, nil
-	}
-
-	found := releaseRE.FindStringSubmatch(s.Text())
-
-	r := &Release{
-		Body:    []string{s.Text()},
-		Title:   found[1],
-		Version: found[2],
-	}
-
-	if found[4] != "" {
-		got, err := time.Parse("2006-01-02", found[4])
-		if nil != err {
-			return nil, fmt.Errorf("Invalid date found: '%s'.  YYYY-MM-DD is required.", found[4])
-		}
-		r.Date = &got
-	}
-	if found[5] != "" {
-		r.Yanked = true
-	}
-
-	lastDetail := ""
-	for {
-		if !s.Scan() ||
-			linksRE.MatchString(s.Text()) ||
-			releaseRE.MatchString(s.Text()) {
-			return r, nil
-		}
-
-		text := s.Text()
-		if emptyLine.MatchString(text) {
-			continue
-		}
-
-		r.Body = append(r.Body, text)
-
-		found := detailsRE.FindStringSubmatch(text)
-		if found != nil {
-			lastDetail = strings.ToLower(found[1])
-			continue
-		}
-
-		r.appendTo(lastDetail, text)
-	}
-}
-
-func (r *Release) appendTo(which, text string) {
-	switch which {
-	case "":
-		r.Other = append(r.Other, text)
-	case "added":
-		r.Added = append(r.Added, text)
-	case "changed":
-		r.Changed = append(r.Changed, text)
-	case "deprecated":
-		r.Deprecated = append(r.Deprecated, text)
-	case "fixed":
-		r.Fixed = append(r.Fixed, text)
-	case "removed":
-		r.Removed = append(r.Removed, text)
-	case "security":
-		r.Security = append(r.Security, text)
 	}
 }
 
 // addHeaders adds the header comments if present to the changelog object.
 func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 	for {
-		if titleRE.MatchString(s.Text()) {
+		if titleRegex.MatchString(s.Text()) {
+			re := regexp.MustCompile(`^\s*(<!--.*-->)?\s*$`)
+
 			full := strings.Join(cl.CommentHeader, " ")
-			if full != "" && !commentCheck.MatchString(full) {
+			if !re.MatchString(full) {
 				return fmt.Errorf("Header was not just comments.")
 			}
 			return nil
 		}
 
-		if !emptyLine.MatchString(s.Text()) {
+		if !emptyLineRegex.MatchString(s.Text()) {
 			cl.CommentHeader = append(cl.CommentHeader, s.Text())
 		}
 
@@ -303,17 +171,15 @@ func (cl *Changelog) addReleases(s *bufio.Scanner) error {
 
 // addTitleBlock adds the title block information to the changelog object.
 func (cl *Changelog) addTitleBlock(s *bufio.Scanner) {
-	title := titleRE.FindStringSubmatch(s.Text())
-	if title == nil {
-		return
-	}
+	title := titleRegex.FindStringSubmatch(s.Text())
+	// Because the title was found in addHeaders() it must be valid here
 
 	cl.Title = title[1]
 
 	for {
 		if !s.Scan() ||
-			linksRE.MatchString(s.Text()) ||
-			releaseRE.MatchString(s.Text()) {
+			linksRegex.MatchString(s.Text()) ||
+			releaseRegex.MatchString(s.Text()) {
 			cl.evalDesc()
 			return
 		}
@@ -325,7 +191,7 @@ func (cl *Changelog) addTitleBlock(s *bufio.Scanner) {
 // addLinks adds the links (if present) to the changelog object.
 func (cl *Changelog) addLinks(s *bufio.Scanner) {
 	for {
-		found := linksRE.FindStringSubmatch(s.Text())
+		found := linksRegex.FindStringSubmatch(s.Text())
 		if found != nil {
 			link := Link{
 				Version: found[1],
@@ -338,6 +204,51 @@ func (cl *Changelog) addLinks(s *bufio.Scanner) {
 			return
 		}
 	}
+}
+
+// Release represents a documented release.
+type Release struct {
+	// The entire text following the ## prefix.
+	Title string
+
+	// The version of the release.  It could be v1.0.2, 1.0.3-pre1 or Unreleased
+	// as examples.
+	Version string
+
+	// The date of the release if present.
+	Date *time.Time
+
+	// If a release has been yanked.
+	Yanked bool
+
+	// Detailed types of changes follow.  If there are multiple instances of
+	// the header, they are merged together and stored in the order they appear
+	// in the file.
+
+	// The lines under the '### Added` header.
+	Added []string
+
+	// The lines under the '### Changed' header.
+	Changed []string
+
+	// The lines under the '### Depreceted' header.
+	Deprecated []string
+
+	// The lines under the '### Removed' header.
+	Removed []string
+
+	// The lines under the '### Fixed' header.
+	Fixed []string
+
+	// The lines under the '### Security' header.
+	Security []string
+
+	// The lines the might immediately follow the release line but not be
+	// associated with any specific header.
+	Other []string
+
+	// The entire body of the release in case that is useful.
+	Body []string
 }
 
 // ToMarkdown converts the Release structure into a markdown formatted stream of
@@ -388,6 +299,94 @@ func (r *Release) ToMarkdown() string {
 	}
 
 	return out
+}
+
+// newRelease attempts to create a new release object based off the stream of
+// data from the scanner.  When it returns (nil, nil) there is nothing left to
+// do and there are no more releases
+func newRelease(s *bufio.Scanner) (*Release, error) {
+	if !releaseRegex.MatchString(s.Text()) {
+		return nil, nil
+	}
+
+	found := releaseRegex.FindStringSubmatch(s.Text())
+
+	r := &Release{
+		Body:    []string{s.Text()},
+		Title:   found[1],
+		Version: found[2],
+	}
+
+	unreleased := false
+	if "unreleased" == strings.ToLower(r.Version) {
+		unreleased = true
+	}
+	if !unreleased && found[3] != "" {
+		got, err := time.Parse("2006-01-02", found[3])
+		if nil != err {
+			return nil, fmt.Errorf("Invalid date found: '%s'.  Format YYYY-MM-DD is required.", found[3])
+		}
+		r.Date = &got
+	}
+
+	if !unreleased && found[4] != "" {
+		r.Yanked = true
+	}
+
+	lastDetail := ""
+	for {
+		if !s.Scan() ||
+			linksRegex.MatchString(s.Text()) ||
+			releaseRegex.MatchString(s.Text()) {
+			return r, nil
+		}
+
+		text := s.Text()
+		if emptyLineRegex.MatchString(text) {
+			continue
+		}
+
+		r.Body = append(r.Body, text)
+
+		found := detailsRegex.FindStringSubmatch(text)
+		if found != nil {
+			lastDetail = strings.ToLower(found[1])
+			continue
+		}
+
+		r.appendTo(lastDetail, text)
+	}
+}
+
+// appendTo the section based on the text string
+func (r *Release) appendTo(which, text string) {
+	switch which {
+	case "":
+		r.Other = append(r.Other, text)
+	case "added":
+		r.Added = append(r.Added, text)
+	case "changed":
+		r.Changed = append(r.Changed, text)
+	case "deprecated":
+		r.Deprecated = append(r.Deprecated, text)
+	case "fixed":
+		r.Fixed = append(r.Fixed, text)
+	case "removed":
+		r.Removed = append(r.Removed, text)
+	case "security":
+		r.Security = append(r.Security, text)
+	}
+}
+
+// The Link structure containing the release version and the representing URL.
+type Link struct {
+	// The version of the release.  It could be v1.0.2, 1.0.3-pre1 or Unreleased
+	// as examples.
+	Version string
+
+	// The following URL that describes the difference between this release and
+	// the previous release
+	Url string
 }
 
 // ToMarkdown converts the Link structure into a markdown formatted stream of

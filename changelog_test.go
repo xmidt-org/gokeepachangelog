@@ -143,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 func TestParseStrict(t *testing.T) {
 	assert := assert.New(t)
 
-	rv, err := Parse(getStrict(), nil)
+	rv, err := Parse(getStrict())
 
 	assert.NotNil(rv)
 	assert.Nil(err)
@@ -207,7 +207,7 @@ func TestParseStrict(t *testing.T) {
 func TestToMarkdown(t *testing.T) {
 	assert := assert.New(t)
 
-	rv, err := Parse(getStrict(), nil)
+	rv, err := Parse(getStrict())
 
 	assert.NotNil(rv)
 	assert.Nil(err)
@@ -232,7 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 	assert := assert.New(t)
 
-	rv, err := Parse(bodyReader, nil)
+	rv, err := Parse(bodyReader)
 
 	assert.NotNil(rv)
 	assert.Nil(err)
@@ -246,4 +246,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 	r := rv.Releases[0]
 	assert.Equal(1, len(r.Other))
+}
+
+func TestParseIgnoreUnreleasedExtras(t *testing.T) {
+	body := `
+# Changelog
+
+## [Unreleased] - 2020-02-22
+- The release date doesn't make sense
+- Something new but unreleased
+`
+	var bodyReader io.Reader = strings.NewReader(body)
+
+	assert := assert.New(t)
+
+	rv, err := Parse(bodyReader)
+
+	assert.NotNil(rv)
+	assert.Nil(err)
+
+	// Spot check the values being returned for some sanity
+	assert.Equal(1, len(rv.Releases))
+
+	r := rv.Releases[0]
+	assert.Nil(r.Date)
+}
+
+func TestParseFailIfHeaderIsBogus(t *testing.T) {
+	body := `
+<!-- legit header -->
+not a legit part of the header
+
+# Changelog
+
+## [Unreleased] - 2020-02-22
+- Something new but unreleased
+`
+	var bodyReader io.Reader = strings.NewReader(body)
+
+	assert := assert.New(t)
+
+	rv, err := Parse(bodyReader)
+
+	assert.Nil(rv)
+	assert.NotNil(err)
+}
+
+func TestParseFailIfNoTitle(t *testing.T) {
+	body := `
+#    
+
+## [Unreleased]
+- Something new but unreleased
+`
+	var bodyReader io.Reader = strings.NewReader(body)
+
+	assert := assert.New(t)
+
+	rv, err := Parse(bodyReader)
+
+	assert.Nil(rv)
+	assert.NotNil(err)
+}
+
+func TestParseFailIfNoHeader(t *testing.T) {
+	body := `
+<!-- legit header -->
+
+## [Unreleased] - 2020-02-22
+- Something new but unreleased
+`
+	var bodyReader io.Reader = strings.NewReader(body)
+
+	assert := assert.New(t)
+
+	rv, err := Parse(bodyReader)
+
+	assert.Nil(rv)
+	assert.NotNil(err)
+}
+
+func TestParseInvalidDate(t *testing.T) {
+	body := `
+# Changelog
+
+## [v1.0.0] - 2020-19-01
+- The date is the wrong format!
+`
+	var bodyReader io.Reader = strings.NewReader(body)
+
+	assert := assert.New(t)
+
+	rv, err := Parse(bodyReader)
+
+	assert.Nil(rv)
+	assert.NotNil(err)
+}
+
+func TestParseSloppyFile(t *testing.T) {
+	body := `
+# Changelog
+
+## [Unreleased]
+### added
+- Something new but unreleased
+
+## [v1.0.0]
+### changed
+- Somthing
+
+## [v0.5.0] 2020-01-19
+- Leave off the dash before the date
+
+## [v0.3.0] - 2020-01-19 [yanked]
+`
+	var r io.Reader = strings.NewReader(body)
+	assert := assert.New(t)
+
+	rv, err := Parse(r)
+	assert.NotNil(rv)
+	assert.Nil(err)
 }
