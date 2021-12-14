@@ -19,6 +19,7 @@ package changelog
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -32,6 +33,8 @@ var (
 	linksRegex     = regexp.MustCompile(`(?i)^\s*\[([^\]]*)\]\s*:\s*(https?://.*?)\s*$`)
 	releaseRegex   = regexp.MustCompile(`(?i)^\s*##\s+(\[([^\]]*)\]\s*-?\s*(\d{4}-\d\d-\d\d)?\s*(\[\s*YANKED\s*\])?)\s*$`)
 	detailsRegex   = regexp.MustCompile(`(?i)^\s*###\s+(Added|Changed|Deprecated|Fixed|Removed|Security)\s*$`)
+
+	ErrParsing = errors.New("there was an error parsing")
 )
 
 // The Changelog structure contains the entire changelog.  It may be populated
@@ -139,7 +142,7 @@ func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 
 			full := strings.Join(cl.CommentHeader, " ")
 			if !re.MatchString(full) {
-				return fmt.Errorf("Header was not just comments.")
+				return fmt.Errorf("%w: Header was not just comments.", ErrParsing)
 			}
 			return nil
 		}
@@ -149,7 +152,7 @@ func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 		}
 
 		if !s.Scan() {
-			return fmt.Errorf("Only the header was present.")
+			return fmt.Errorf("%w: Only the header was present.", ErrParsing)
 		}
 	}
 }
@@ -324,7 +327,7 @@ func newRelease(s *bufio.Scanner) (*Release, error) {
 	if !unreleased && found[3] != "" {
 		got, err := time.Parse("2006-01-02", found[3])
 		if nil != err {
-			return nil, fmt.Errorf("Invalid date found: '%s'.  Format YYYY-MM-DD is required.", found[3])
+			return nil, fmt.Errorf("%w: Invalid date found: '%s'.  Format YYYY-MM-DD is required.", ErrParsing, found[3])
 		}
 		r.Date = &got
 	}

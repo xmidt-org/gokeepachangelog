@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.0.2] - 2021-12-13
+
+### Changed
+- Added the `ErrParsing` error and made errors derivative of that error.
+
 ## [v0.0.1] - 2021-09-22
 
 ### Added
