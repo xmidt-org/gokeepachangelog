@@ -6,14 +6,10 @@ on:
     branches:
       - main
     paths-ignore:
-      - **.md
+      - *.md
       - LICENSE
       - NOTICE
   pull_request:
-    paths-ignore:
-      - **.md
-      - LICENSE
-      - NOTICE
   workflow_dispatch:
 
 jobs:
