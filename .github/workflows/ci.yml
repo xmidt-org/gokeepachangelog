@@ -1,0 +1,22 @@
+---
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - **.md
+      - LICENSE
+      - NOTICE
+  pull_request:
+    paths-ignore:
+      - **.md
+      - LICENSE
+      - NOTICE
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: xmidt-org/.github/.github/workflows/go-ci.yml@go-ci-v1
+    secrets: inherit
