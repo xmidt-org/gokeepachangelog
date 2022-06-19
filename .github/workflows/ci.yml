@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
 ---
 name: CI
 
@@ -6,7 +8,9 @@ on:
     branches:
       - main
     paths-ignore:
-      - '*.md'
+      - README.md
+      - CONTRIBUTING.md
+      - MAINTAINERS.md
       - LICENSE
       - NOTICE
   pull_request:
