@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: gokeepachangelog
+Upstream-Contact: John Bass <johnbass1017@yahoo.com>
+Source: https://github.com/xmidt-org/gokeepachangelog
+
+Files: go.* NOTICE *.md .whitesource .gitignore
+Copyright: SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: changelog_test.go
+Copyright: SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
+License: Apache-2.0
