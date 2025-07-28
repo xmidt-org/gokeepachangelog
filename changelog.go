@@ -128,7 +128,7 @@ func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 
 			full := strings.Join(cl.CommentHeader, " ")
 			if !re.MatchString(full) {
-				return fmt.Errorf("%w: Header was not just comments.", ErrParsing)
+				return fmt.Errorf("%w: Header was not just comments", ErrParsing)
 			}
 			return nil
 		}
@@ -138,7 +138,7 @@ func (cl *Changelog) addHeaders(s *bufio.Scanner) error {
 		}
 
 		if !s.Scan() {
-			return fmt.Errorf("%w: Only the header was present.", ErrParsing)
+			return fmt.Errorf("%w: Only the header was present", ErrParsing)
 		}
 	}
 }
@@ -306,14 +306,17 @@ func newRelease(s *bufio.Scanner) (*Release, error) {
 		Version: found[2],
 	}
 
-	unreleased := false
-	if "unreleased" == strings.ToLower(r.Version) {
+	var unreleased bool
+	if strings.ToLower(r.Version) == "unreleased" {
 		unreleased = true
+	} else {
+		unreleased = false
 	}
+
 	if !unreleased && found[3] != "" {
 		got, err := time.Parse("2006-01-02", found[3])
 		if nil != err {
-			return nil, fmt.Errorf("%w: Invalid date found: '%s'.  Format YYYY-MM-DD is required.", ErrParsing, found[3])
+			return nil, fmt.Errorf("%w: Invalid date found: '%s'.  Format YYYY-MM-DD is required", ErrParsing, found[3])
 		}
 		r.Date = &got
 	}
