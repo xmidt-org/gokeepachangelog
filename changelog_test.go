@@ -140,8 +140,8 @@ func TestParseStrict(t *testing.T) {
 
 	assert.Equal(4, len(rv.CommentHeader))
 	assert.Equal("<!--", rv.CommentHeader[0])
-	assert.Equal("SPDX-FileCopyrightText: 2021 Comcast Cable Communications Management, LLC", rv.CommentHeader[1])
-	assert.Equal("SPDX-License-Identifier: Apache-2.0", rv.CommentHeader[2])
+	assert.Equal("SPDX-FileCopyrightText: 2021 Comcast Cable Communications Management, LLC", rv.CommentHeader[1]) // REUSE-IgnoreStart
+	assert.Equal("SPDX-License-Identifier: Apache-2.0", rv.CommentHeader[2])                                       // REUSE-IgnoreEnd
 	assert.Equal("-->", rv.CommentHeader[3])
 
 	assert.Equal("Changelog", rv.Title)
